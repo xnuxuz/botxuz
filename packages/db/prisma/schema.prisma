@@ -14,15 +14,73 @@ datasource db {
 }
 
 // ---------------------------------------------------------------------------
-// Fase 0 sengaja hanya memodelkan User. Entitas lain (events, tasks, sessions,
-// accounts, transactions, budgets, categories, user_facts, dst.) menyusul di
-// dokumen schema terpisah — lihat REQUIREMENT.MD §6.
+// Aturan yang berlaku untuk SEMUA tabel di file ini (REQUIREMENT §3.4, §5.2, §5.4):
+//   - wajib punya userId sejak hari pertama (future-proofing SaaS)
+//   - uang selalu Int rupiah, tidak pernah Float/Decimal
+//   - timestamp disimpan UTC, konversi timezone di edge/client
+//   - id memakai UUIDv7: acak tapi terurut waktu, jadi index B-tree tetap padat
 //
-// Aturan yang berlaku untuk SEMUA tabel berikutnya:
-//   - wajib punya userId sejak hari pertama (future-proofing SaaS, §5.4)
-//   - uang selalu Int rupiah, tidak pernah Float/Decimal (§3.4)
-//   - timestamp disimpan UTC, konversi timezone di edge (§5.2)
+// Session auth TIDAK ditabelkan: refresh token hidup di Redis dengan TTL
+// (§3.1), jadi tabel `sessions` di bawah ini adalah sesi kerja/grinding.
 // ---------------------------------------------------------------------------
+
+enum CategoryDomain {
+  task
+  finance
+  event
+}
+
+enum TaskStatus {
+  todo
+  in_progress
+  done
+  cancelled
+}
+
+enum TaskPriority {
+  low
+  medium
+  high
+  urgent
+}
+
+enum AccountType {
+  cash
+  bank
+  ewallet
+}
+
+enum TransactionType {
+  income
+  expense
+  transfer
+}
+
+enum ReminderRefType {
+  event
+  task
+}
+
+enum ReminderStatus {
+  pending
+  sent
+  failed
+  cancelled
+}
+
+enum NotificationChannel {
+  telegram
+  email
+  push
+  whatsapp
+}
+
+enum FeedbackVerdict {
+  up
+  down
+}
+
+// --- Auth & user -----------------------------------------------------------
 
 model User {
   id           String  @id @default(uuid(7)) @db.Char(36)
@@ -36,8 +94,398 @@ model User {
   // Diisi setelah user menjalankan /link <code> di bot Telegram.
   telegramChatId String? @unique @map("telegram_chat_id") @db.VarChar(32)
 
+  // Jam kirim daily briefing dalam menit sejak tengah malam waktu lokal user.
+  briefingMinute Int     @default(360) @map("briefing_minute")
+  briefingOn     Boolean @default(true) @map("briefing_on")
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
+  categories      Category[]
+  events          Event[]
+  reminders       Reminder[]
+  tasks           Task[]
+  workSessions    WorkSession[]
+  goals           Goal[]
+  accounts        Account[]
+  transactions    Transaction[]
+  budgets         Budget[]
+  recurringTxns   RecurringTransaction[]
+  facts           UserFact[]
+  correctionRules CorrectionRule[]
+  aiFeedback      AiFeedback[]
+  memoryEpisodes  MemoryEpisode[]
+  notifPrefs      NotificationPreference[]
+
   @@map("users")
+}
+
+// --- Kategori (dipakai tiga modul sekaligus) --------------------------------
+
+model Category {
+  id     String         @id @default(uuid(7)) @db.Char(36)
+  userId String         @map("user_id") @db.Char(36)
+  domain CategoryDomain
+  name   String         @db.VarChar(60)
+  color  String?        @db.VarChar(9)
+  icon   String?        @db.VarChar(32)
+
+  archivedAt DateTime? @map("archived_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+
+  user          User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  events        Event[]
+  tasks         Task[]
+  workSessions  WorkSession[]
+  goals         Goal[]
+  transactions  Transaction[]
+  budgets       Budget[]
+  recurringTxns RecurringTransaction[]
+
+  // Nama kategori unik per domain, bukan global: "Kuliah" boleh ada di task dan event.
+  @@unique([userId, domain, name])
+  @@index([userId, domain])
+  @@map("categories")
+}
+
+// --- Schedule ---------------------------------------------------------------
+
+model Event {
+  id          String   @id @default(uuid(7)) @db.Char(36)
+  userId      String   @map("user_id") @db.Char(36)
+  title       String   @db.VarChar(200)
+  description String?  @db.Text
+  startAt     DateTime @map("start_at")
+  endAt       DateTime @map("end_at")
+  allDay      Boolean  @default(false) @map("all_day")
+
+  // RRULE RFC 5545 supaya kompatibel Google Calendar (§3.2).
+  rrule      String? @db.VarChar(255)
+  location   String? @db.VarChar(200)
+  categoryId String? @map("category_id") @db.Char(36)
+
+  // Id event di Google Calendar; null selama belum disinkronkan.
+  gcalId String? @map("gcal_id") @db.VarChar(128)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  // Query utama: "jadwal user X antara A dan B".
+  @@index([userId, startAt])
+  @@index([userId, gcalId])
+  @@map("events")
+}
+
+model Reminder {
+  id      String          @id @default(uuid(7)) @db.Char(36)
+  userId  String          @map("user_id") @db.Char(36)
+  refType ReminderRefType @map("ref_type")
+  refId   String          @map("ref_id") @db.Char(36)
+
+  fireAt  DateTime            @map("fire_at")
+  channel NotificationChannel @default(telegram)
+  status  ReminderStatus      @default(pending)
+
+  // Job id BullMQ — dipakai untuk cancel saat event digeser/dihapus (§3.6 idempotency).
+  jobId  String?   @unique @map("job_id") @db.VarChar(120)
+  sentAt DateTime? @map("sent_at")
+  error  String?   @db.VarChar(500)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, fireAt])
+  @@index([status, fireAt])
+  @@index([refType, refId])
+  @@map("reminders")
+}
+
+// --- Grinding / produktivitas ----------------------------------------------
+
+model Task {
+  id          String       @id @default(uuid(7)) @db.Char(36)
+  userId      String       @map("user_id") @db.Char(36)
+  title       String       @db.VarChar(200)
+  description String?      @db.Text
+  categoryId  String?      @map("category_id") @db.Char(36)
+  priority    TaskPriority @default(medium)
+  status      TaskStatus   @default(todo)
+
+  deadline    DateTime?
+  rrule       String?   @db.VarChar(255)
+  completedAt DateTime? @map("completed_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category     Category?     @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  workSessions WorkSession[]
+
+  @@index([userId, status, deadline])
+  @@index([userId, categoryId])
+  @@map("tasks")
+}
+
+/// Sesi kerja (timer atau entri manual), bukan sesi login.
+model WorkSession {
+  id         String  @id @default(uuid(7)) @db.Char(36)
+  userId     String  @map("user_id") @db.Char(36)
+  taskId     String? @map("task_id") @db.Char(36)
+  categoryId String? @map("category_id") @db.Char(36)
+
+  startedAt DateTime  @map("started_at")
+  endedAt   DateTime? @map("ended_at")
+
+  // Diisi saat sesi ditutup; disimpan supaya agregasi statistik tidak menghitung ulang.
+  durationMin Int?    @map("duration_min")
+  note        String? @db.VarChar(500)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  task     Task?     @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  category Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  @@index([userId, startedAt])
+  @@index([userId, categoryId, startedAt])
+  @@map("sessions")
+}
+
+model Goal {
+  id         String @id @default(uuid(7)) @db.Char(36)
+  userId     String @map("user_id") @db.Char(36)
+  categoryId String @map("category_id") @db.Char(36)
+
+  targetMinutesWeekly Int @map("target_minutes_weekly")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, categoryId])
+  @@map("goals")
+}
+
+// --- Finance ----------------------------------------------------------------
+
+model Account {
+  id     String      @id @default(uuid(7)) @db.Char(36)
+  userId String      @map("user_id") @db.Char(36)
+  name   String      @db.VarChar(60)
+  type   AccountType
+
+  // Saldo hasil kalkulasi, di-cache supaya list account tidak menjumlah seluruh ledger.
+  // Sumber kebenaran tetap tabel transactions. Rupiah, integer.
+  balanceCached Int @default(0) @map("balance_cached")
+
+  archivedAt DateTime? @map("archived_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions Transaction[] @relation("TxnAccount")
+  transfersIn  Transaction[] @relation("TxnTransferAccount")
+
+  @@unique([userId, name])
+  @@index([userId])
+  @@map("accounts")
+}
+
+model Transaction {
+  id        String          @id @default(uuid(7)) @db.Char(36)
+  userId    String          @map("user_id") @db.Char(36)
+  accountId String          @map("account_id") @db.Char(36)
+  type      TransactionType
+
+  /// Rupiah, INTEGER, selalu positif. Arah ditentukan oleh `type`.
+  amountInt Int @map("amount_int")
+
+  categoryId String? @map("category_id") @db.Char(36)
+  note       String? @db.VarChar(500)
+
+  occurredAt DateTime @map("occurred_at")
+
+  /// Tujuan transfer; hanya terisi saat type = transfer.
+  transferAccountId String? @map("transfer_account_id") @db.Char(36)
+
+  /// Id yang dibuat client (mobile offline-first) — kunci idempotensi insert.
+  clientGeneratedId String? @map("client_generated_id") @db.VarChar(64)
+
+  /// Soft delete: data finance tidak pernah benar-benar dihapus (§3.4).
+  deletedAt DateTime? @map("deleted_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  account         Account   @relation("TxnAccount", fields: [accountId], references: [id], onDelete: Cascade)
+  transferAccount Account?  @relation("TxnTransferAccount", fields: [transferAccountId], references: [id], onDelete: SetNull)
+  category        Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, clientGeneratedId])
+  @@index([userId, occurredAt])
+  @@index([userId, categoryId, occurredAt])
+  @@index([accountId, occurredAt])
+  @@map("transactions")
+}
+
+model Budget {
+  id         String @id @default(uuid(7)) @db.Char(36)
+  userId     String @map("user_id") @db.Char(36)
+  categoryId String @map("category_id") @db.Char(36)
+
+  /// Bulan anggaran sebagai yyyymm (mis. 202607) — mudah di-range-query, tidak ambigu timezone.
+  month    Int
+  limitInt Int @map("limit_int")
+
+  /// Bitmask ambang alert yang sudah dikirim, supaya 80% & 100% tidak spam tiap job.
+  alertedMask Int @default(0) @map("alerted_mask")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, categoryId, month])
+  @@index([userId, month])
+  @@map("budgets")
+}
+
+model RecurringTransaction {
+  id         String  @id @default(uuid(7)) @db.Char(36)
+  userId     String  @map("user_id") @db.Char(36)
+  accountId  String  @map("account_id") @db.Char(36)
+  categoryId String? @map("category_id") @db.Char(36)
+
+  /// Template transaksi (type, amountInt, note) — divalidasi ulang saat dieksekusi.
+  templateJson Json @map("template_json")
+
+  rrule     String   @db.VarChar(255)
+  nextRunAt DateTime @map("next_run_at")
+  active    Boolean  @default(true)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  @@index([active, nextRunAt])
+  @@index([userId])
+  @@map("recurring_txn")
+}
+
+// --- Memory & AI ------------------------------------------------------------
+
+model UserFact {
+  id       String @id @default(uuid(7)) @db.Char(36)
+  userId   String @map("user_id") @db.Char(36)
+  category String @db.VarChar(60)
+  key      String @db.VarChar(120)
+  value    String @db.Text
+
+  /// 0..1 — fakta hasil ekstraksi LLM lebih rendah daripada yang diinput user.
+  confidence Float  @default(0.5)
+  source     String @default("manual") @db.VarChar(40)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, category, key])
+  @@index([userId])
+  @@map("user_facts")
+}
+
+model CorrectionRule {
+  id     String @id @default(uuid(7)) @db.Char(36)
+  userId String @map("user_id") @db.Char(36)
+
+  /// Pola yang dicocokkan ke teks input (lowercase, substring atau regex sederhana).
+  pattern String @db.VarChar(200)
+  field   String @db.VarChar(60)
+  value   String @db.VarChar(200)
+
+  /// Override deterministik menang atas tebakan LLM; hitCount dipakai untuk pruning.
+  hitCount Int @default(0) @map("hit_count")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, pattern, field])
+  @@index([userId])
+  @@map("correction_rules")
+}
+
+model AiFeedback {
+  id         String          @id @default(uuid(7)) @db.Char(36)
+  userId     String          @map("user_id") @db.Char(36)
+  actionType String          @map("action_type") @db.VarChar(60)
+  payload    Json
+  verdict    FeedbackVerdict
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("ai_feedback")
+}
+
+model MemoryEpisode {
+  id      String @id @default(uuid(7)) @db.Char(36)
+  userId  String @map("user_id") @db.Char(36)
+  summary String @db.Text
+
+  /// Key vektor di Redis Search — embedding-nya tidak disimpan di MySQL.
+  embeddingRef String? @map("embedding_ref") @db.VarChar(120)
+
+  periodStart DateTime @map("period_start")
+  periodEnd   DateTime @map("period_end")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, periodStart])
+  @@map("memory_episodes")
+}
+
+// --- Notifikasi -------------------------------------------------------------
+
+model NotificationPreference {
+  id     String @id @default(uuid(7)) @db.Char(36)
+  userId String @map("user_id") @db.Char(36)
+
+  /// Jenis notifikasi: reminder | digest | budget_alert | system.
+  notifType String @map("notif_type") @db.VarChar(40)
+
+  /// Urutan channel yang dicoba, mis. ["telegram","email"].
+  channelsJson Json @map("channels_json")
+
+  /// Menit sejak tengah malam waktu lokal user; null = tanpa quiet hours.
+  quietStartMinute Int? @map("quiet_start_minute")
+  quietEndMinute   Int? @map("quiet_end_minute")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, notifType])
+  @@map("notif_prefs")
 }

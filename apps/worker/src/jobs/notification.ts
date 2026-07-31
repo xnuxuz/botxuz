@@ -1,25 +1,59 @@
-import { type NotificationPayload, notificationPayloadSchema } from '@xnuxuz/shared';
+import {
+  NOTIF_TYPES,
+  type NotificationChannel,
+  type NotificationPayload,
+  type NotificationPriority,
+  type NotifType,
+  notificationPayloadSchema,
+} from '@xnuxuz/shared';
 import type { Job } from 'bullmq';
 import { logger } from '../config.js';
+import { notifications } from '../notify.js';
+import { getQueue, QUEUES } from '../queues.js';
 
 export type NotificationJob = {
   userId: string;
-  channels?: string[];
+  notifType?: NotifType;
+  channels?: NotificationChannel[];
+  priority?: NotificationPriority;
+  bypassQuietHours?: boolean;
   payload: NotificationPayload;
 };
 
 /**
- * Consumer queue notifikasi. Dispatch sebenarnya ke adapter (Telegram, email,
- * push) menyusul bersama NotificationService di fase 0 lanjutan.
+ * Satu-satunya consumer yang memanggil NotificationService. Job gagal sengaja
+ * dilempar ulang supaya BullMQ yang mengurus retry + backoff, bukan kode ini.
  */
 export async function processNotification(job: Job<NotificationJob>): Promise<void> {
-  const { userId, payload } = job.data;
-  notificationPayloadSchema.parse(payload);
+  const { userId, notifType = NOTIF_TYPES.system, channels, priority, bypassQuietHours } = job.data;
+  const payload = notificationPayloadSchema.parse(job.data.payload);
 
-  logger.info(
-    { jobId: job.id, userId, title: payload.title },
-    'Notifikasi diterima (adapter belum terpasang)',
-  );
+  const result = await notifications.send(userId, payload, {
+    notifType,
+    channels,
+    priority,
+    bypassQuietHours,
+  });
 
-  await Promise.resolve();
+  if (result.status === 'sent') {
+    logger.info({ jobId: job.id, userId, channel: result.channel }, 'Notifikasi terkirim');
+    return;
+  }
+
+  if (result.status === 'deferred') {
+    // Quiet hours: jangan dibuang, jadwalkan ulang tepat setelah jendelanya lewat.
+    const delay = Math.max(result.retryAt.getTime() - Date.now(), 0);
+    await getQueue(QUEUES.notification).add('deferred', job.data, {
+      delay,
+      jobId: `${payload.idempotencyKey}:deferred`,
+    });
+    logger.info(
+      { jobId: job.id, userId, retryAt: result.retryAt },
+      'Notifikasi ditunda (quiet hours)',
+    );
+    return;
+  }
+
+  const detail = result.errors.map((entry) => `${entry.channel}: ${entry.error}`).join('; ');
+  throw new Error(`Semua channel gagal — ${detail}`);
 }

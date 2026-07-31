@@ -8,6 +8,8 @@ import { logger } from './config/logger.js';
 import { errorHandler, notFoundHandler } from './http/errors.js';
 import { healthRouter } from './http/health.js';
 import { globalRateLimit } from './http/rate-limit.js';
+import { authRouter } from './modules/auth/routes.js';
+import { userRouter } from './modules/user/routes.js';
 
 export function createApp(): Express {
   const app = express();
@@ -27,10 +29,12 @@ export function createApp(): Express {
   app.use(globalRateLimit);
 
   const v1 = Router();
-  // Modul (auth, schedule, grinding, finance, ai) didaftarkan di sini per fase.
+  // Modul (schedule, grinding, finance, ai) menyusul di sini per fase.
   v1.get('/', (_req, res) => {
-    res.json({ ok: true, data: { version: 'v1', modules: [] } });
+    res.json({ ok: true, data: { version: 'v1', modules: ['auth', 'user'] } });
   });
+  v1.use('/auth', authRouter);
+  v1.use('/user', userRouter);
   app.use(API_PREFIX, v1);
 
   app.use(notFoundHandler);

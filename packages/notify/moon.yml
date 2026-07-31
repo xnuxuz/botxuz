@@ -1,0 +1,15 @@
+$schema: 'https://moonrepo.dev/schemas/project.json'
+
+layer: 'library'
+language: 'typescript'
+toolchains:
+  default: 'node'
+stack: 'backend'
+
+project:
+  name: 'notify'
+  description: 'NotificationService: routing per preferensi user + adapter Telegram/email'
+
+dependsOn:
+  - 'shared'
+  - 'db'

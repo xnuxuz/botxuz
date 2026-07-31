@@ -1,4 +1,5 @@
 import { Bot } from 'grammy';
+import { ApiError, linkTelegramAccount } from '../api-client.js';
 import { env, logger } from '../config.js';
 
 /**
@@ -16,7 +17,7 @@ export function createTelegramBot(token: string): Bot {
       'Halo! Aku asisten xnuxuz.\n\n' +
         'Hubungkan akunmu dulu dengan:\n' +
         '/link <kode>\n\n' +
-        'Kode bisa diambil dari web dashboard.',
+        'Kode bisa diambil dari web dashboard (berlaku 10 menit).',
     );
   });
 
@@ -26,8 +27,30 @@ export function createTelegramBot(token: string): Bot {
       await ctx.reply('Formatnya: /link ABC123');
       return;
     }
-    // TODO(fase 0): POST {API_BASE_URL}/api/v1/auth/telegram/link
-    await ctx.reply('Fitur link belum aktif — menunggu modul auth.');
+
+    const chatId = String(ctx.chat.id);
+
+    try {
+      const user = await linkTelegramAccount(code, chatId);
+      await ctx.reply(`Akun ${user.displayName ?? user.email} berhasil terhubung. 🎉`);
+    } catch (error) {
+      if (error instanceof ApiError) {
+        // Pesan API sudah ramah user (kode kedaluwarsa, chat sudah dipakai, dst.).
+        await ctx.reply(`Gagal menghubungkan: ${error.message}`);
+        return;
+      }
+      logger.error({ err: error }, 'Gagal memanggil API saat /link');
+      await ctx.reply('Server sedang tidak bisa dihubungi. Coba lagi sebentar lagi.');
+    }
+  });
+
+  bot.command('help', async (ctx) => {
+    await ctx.reply(
+      'Perintah yang tersedia:\n' +
+        '/link <kode> — hubungkan akun\n' +
+        '/help — bantuan\n\n' +
+        'Perintah jadwal, task, dan finance menyusul di fase berikutnya.',
+    );
   });
 
   bot.catch((error) => {

@@ -13,6 +13,13 @@ const workerEnvSchema = baseEnvSchema.extend({
 
   /** Jumlah job paralel per worker. Kecil saja — VPS-nya 4 vCPU. */
   WORKER_CONCURRENCY: z.coerce.number().int().min(1).max(20).default(4),
+
+  /** SMTP opsional: kalau kosong, adapter email dianggap tidak terkonfigurasi. */
+  SMTP_HOST: z.string().optional(),
+  SMTP_PORT: z.coerce.number().int().min(1).max(65_535).default(587),
+  SMTP_USER: z.string().optional(),
+  SMTP_PASSWORD: z.string().optional(),
+  SMTP_FROM: z.string().optional(),
 });
 
 export type WorkerEnv = z.infer<typeof workerEnvSchema>;

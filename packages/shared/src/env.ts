@@ -41,6 +41,9 @@ export const baseEnvSchema = z.object({
 
   JWT_ACCESS_SECRET: z.string().min(32, 'JWT_ACCESS_SECRET minimal 32 karakter'),
   JWT_REFRESH_SECRET: z.string().min(32, 'JWT_REFRESH_SECRET minimal 32 karakter'),
+
+  /** Shared secret untuk panggilan worker → API (endpoint internal, bukan publik). */
+  INTERNAL_API_SECRET: z.string().min(32, 'INTERNAL_API_SECRET minimal 32 karakter'),
 });
 
 export type BaseEnv = z.infer<typeof baseEnvSchema>;

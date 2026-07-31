@@ -21,6 +21,43 @@ export type NotificationChannel = (typeof NOTIFICATION_CHANNELS)[number];
 export const NOTIFICATION_PRIORITIES = ['low', 'normal', 'high'] as const;
 export type NotificationPriority = (typeof NOTIFICATION_PRIORITIES)[number];
 
+/** Jenis notifikasi — preferensi channel disimpan per jenis (§3.6). */
+export const NOTIF_TYPES = {
+  reminder: 'reminder',
+  digest: 'digest',
+  budgetAlert: 'budget_alert',
+  system: 'system',
+} as const;
+
+export type NotifType = (typeof NOTIF_TYPES)[keyof typeof NOTIF_TYPES];
+
+/**
+ * Urutan channel default per jenis. Reminder ke Telegram karena butuh cepat;
+ * digest ke email karena panjang dan tidak mendesak.
+ */
+export const DEFAULT_NOTIF_CHANNELS: Record<NotifType, NotificationChannel[]> = {
+  reminder: ['telegram'],
+  digest: ['telegram'],
+  budget_alert: ['telegram'],
+  system: ['telegram'],
+};
+
+/** Status task & prioritas — nilainya sama persis dengan enum Prisma. */
+export const TASK_STATUSES = ['todo', 'in_progress', 'done', 'cancelled'] as const;
+export type TaskStatusValue = (typeof TASK_STATUSES)[number];
+
+export const TASK_PRIORITIES = ['low', 'medium', 'high', 'urgent'] as const;
+export type TaskPriorityValue = (typeof TASK_PRIORITIES)[number];
+
+export const ACCOUNT_TYPES = ['cash', 'bank', 'ewallet'] as const;
+export type AccountTypeValue = (typeof ACCOUNT_TYPES)[number];
+
+export const TRANSACTION_TYPES = ['income', 'expense', 'transfer'] as const;
+export type TransactionTypeValue = (typeof TRANSACTION_TYPES)[number];
+
+export const REMINDER_REF_TYPES = ['event', 'task'] as const;
+export type ReminderRefTypeValue = (typeof REMINDER_REF_TYPES)[number];
+
 /** Ambang alert budget — kirim peringatan Telegram saat terlampaui. */
 export const BUDGET_ALERT_THRESHOLDS = [0.8, 1.0] as const;
 
