@@ -4,7 +4,7 @@ Personal assistant system yang meng-cover **schedule**, **grinding/produktivitas
 **finance** dalam satu ekosistem, diakses lewat Telegram, web, dan (nanti) mobile.
 
 Spesifikasi lengkap ada di [`REQUIREMENT.MD`](./REQUIREMENT.MD).
-Repo ini saat ini berada di **Fase 0 — Foundation**.
+Fase 0 (foundation) selesai; **Fase 1 — Assistant MVP** sedang berjalan.
 
 ---
 
@@ -20,6 +20,7 @@ xnuxuz/
 ├── packages/
 │   ├── shared/             # types, zod schema, konstanta          (@xnuxuz/shared)
 │   ├── db/                 # Prisma schema, migration, query layer (@xnuxuz/db)
+│   ├── notify/             # NotificationService + adapter         (@xnuxuz/notify)
 │   └── ai/                 # abstraksi LLM + function schema       (@xnuxuz/ai)
 ├── infra/
 │   ├── Dockerfile          # multi-stage: api, worker, web
@@ -106,21 +107,59 @@ Set `DOMAIN` di `.env` ke domain asli sebelum menjalankan di VPS.
 
 ---
 
-## Status Fase 0
+## Endpoint
 
-Sudah ada:
+Semua di bawah `/api/v1`. Kecuali `/auth/register`, `/auth/login`, `/auth/refresh`,
+semuanya butuh header `Authorization: Bearer <access token>`.
+
+| Metode | Path | Fungsi |
+|---|---|---|
+| POST | `/auth/register` `/auth/login` `/auth/refresh` `/auth/logout` | kredensial & token |
+| GET | `/auth/me` | profil user |
+| GET/DELETE | `/auth/sessions[/:id]` | device management |
+| POST/DELETE | `/auth/telegram/code`, `/auth/telegram/link` | hubungkan akun Telegram |
+| PATCH | `/user/me` | timezone, jam briefing |
+| GET/PUT | `/user/notif-prefs[/:type]` | channel & quiet hours per jenis notifikasi |
+| GET/POST/PATCH/DELETE | `/categories` | kategori task/event/finance |
+| GET/POST/PATCH/DELETE | `/tasks` | CRUD task |
+| POST | `/tasks/:id/complete` | selesai; task berulang otomatis dibuat ulang |
+| GET | `/events/schedule?from=&to=` | jadwal dengan RRULE sudah diekspansi |
+| GET | `/events/conflicts?from=&to=` | cek bentrok sebelum simpan |
+| GET/POST/PATCH/DELETE | `/events` | CRUD event |
+
+Endpoint di bawah `/internal` hanya untuk worker/bot, dilindungi
+`x-internal-secret`, dan tidak diteruskan Caddy ke publik.
+
+## Perintah bot
+
+`/link <kode>` · `/today` · `/tasks` · `/task <judul>` · `/done <nomor>` · `/help`
+
+Handler bot hanya meneruskan ke API dan menampilkan balasannya — nol business
+logic di bot (§2).
+
+## Status
+
+Fase 0 — selesai:
 
 - Monorepo moon + Biome, toolchain Node/pnpm ter-pin
-- Express API dengan helmet, CORS, rate limit ber-Redis, error handler berkode stabil,
+- Express API: helmet, CORS, rate limit ber-Redis, error handler berkode stabil,
   health/readiness check, graceful shutdown
-- Worker BullMQ (queue `reminder` + `notification`) dan kerangka bot Telegram long-polling
-- Prisma 7 (query compiler TS, tanpa Rust engine) + migration `init`
-- Abstraksi LLM (Groq + embedding Gemini) dan function schema intent router
+- Auth: argon2id, JWT 15 menit, refresh token opaque dengan rotasi + deteksi reuse,
+  device management, link Telegram lewat kode sekali pakai
+- `NotificationService` (package terpisah) dengan adapter Telegram & email,
+  fallback antar-channel, quiet hours, dan preferensi per jenis notifikasi
+- Data model penuh 16 tabel sesuai §6
 - Docker Compose + Dockerfile multi-stage + Caddy, GitHub Actions `moon ci`
 
-Belum ada (langkah berikutnya):
+Fase 1 — sedang berjalan:
 
-- Modul auth (register/login argon2id, JWT + refresh rotasi, `/link` Telegram)
-- `NotificationService` beserta adapter Telegram & email
-- Data model penuh — baru `User` yang dimodelkan; sisanya menunggu dokumen schema
-  terpisah sesuai REQUIREMENT §6
+- ✅ CRUD task (prioritas, deadline, recurring lewat RRULE) dan event
+  (RRULE kompatibel Google Calendar, deteksi bentrok)
+- ✅ Reminder BullMQ: offset kustom atau default kategori, dibatalkan otomatis
+  saat item digeser/dihapus, job id deterministik supaya tidak double-fire
+- ✅ Daily briefing per zona waktu user (jadwal, task prioritas, sisa jatah harian)
+- ✅ Bot Telegram dua arah
+- ⬜ Session logging & streak, goal mingguan, nightly review
+
+Belum tersentuh: modul finance (fase 3), AI layer (fase 2), Google Calendar sync,
+dashboard web.

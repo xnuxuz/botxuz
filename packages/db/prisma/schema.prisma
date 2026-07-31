@@ -130,6 +130,9 @@ model Category {
   color  String?        @db.VarChar(9)
   icon   String?        @db.VarChar(32)
 
+  /// Reminder default untuk item baru di kategori ini (§3.2), dalam menit.
+  defaultReminderMinutes Int? @map("default_reminder_minutes")
+
   archivedAt DateTime? @map("archived_at")
   createdAt  DateTime  @default(now()) @map("created_at")
   updatedAt  DateTime  @updatedAt @map("updated_at")
@@ -167,6 +170,10 @@ model Event {
 
   // Id event di Google Calendar; null selama belum disinkronkan.
   gcalId String? @map("gcal_id") @db.VarChar(128)
+
+  /// Offset reminder dalam menit sebelum mulai, mis. [30, 5]. Disimpan supaya
+  /// job harian bisa memperpanjang reminder event berulang tanpa menebak.
+  reminderOffsets Json? @map("reminder_offsets")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -220,6 +227,9 @@ model Task {
   deadline    DateTime?
   rrule       String?   @db.VarChar(255)
   completedAt DateTime? @map("completed_at")
+
+  /// Offset reminder dalam menit sebelum deadline, mis. [1440, 60].
+  reminderOffsets Json? @map("reminder_offsets")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")

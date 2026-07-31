@@ -1,5 +1,5 @@
 import { Bot } from 'grammy';
-import { ApiError, linkTelegramAccount } from '../api-client.js';
+import { ApiError, linkTelegramAccount, sendTelegramCommand } from '../api-client.js';
 import { env, logger } from '../config.js';
 
 /**
@@ -48,10 +48,36 @@ export function createTelegramBot(token: string): Bot {
     await ctx.reply(
       'Perintah yang tersedia:\n' +
         '/link <kode> — hubungkan akun\n' +
+        '/today — briefing hari ini\n' +
+        '/tasks — daftar task terbuka\n' +
+        '/task <judul> — buat task baru\n' +
+        '/done <nomor> — tandai task selesai\n' +
         '/help — bantuan\n\n' +
-        'Perintah jadwal, task, dan finance menyusul di fase berikutnya.',
+        'Perintah finance menyusul di fase berikutnya.',
     );
   });
+
+  // Perintah berikut hanya meneruskan ke API dan menampilkan balasannya —
+  // nol business logic di bot (§2).
+  for (const command of ['today', 'tasks', 'task', 'done'] as const) {
+    bot.command(command, async (ctx) => {
+      try {
+        const reply = await sendTelegramCommand(
+          String(ctx.chat.id),
+          command,
+          ctx.match?.trim() ?? '',
+        );
+        await ctx.reply(reply.text);
+      } catch (error) {
+        if (error instanceof ApiError) {
+          await ctx.reply(`Gagal: ${error.message}`);
+          return;
+        }
+        logger.error({ err: error, command }, 'Gagal memanggil API');
+        await ctx.reply('Server sedang tidak bisa dihubungi. Coba lagi sebentar lagi.');
+      }
+    });
+  }
 
   bot.catch((error) => {
     logger.error({ err: error.error, update: error.ctx.update.update_id }, 'Error di bot Telegram');

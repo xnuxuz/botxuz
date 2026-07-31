@@ -15,6 +15,10 @@ export class AppError extends Error {
     this.name = 'AppError';
   }
 
+  static badRequest(message: string, details?: unknown): AppError {
+    return new AppError(400, ERROR_CODES.VALIDATION_FAILED, message, details);
+  }
+
   static unauthorized(message = 'Autentikasi diperlukan'): AppError {
     return new AppError(401, ERROR_CODES.UNAUTHORIZED, message);
   }

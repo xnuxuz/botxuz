@@ -42,3 +42,19 @@ export type LinkedUser = { id: string; email: string; displayName: string | null
 export function linkTelegramAccount(code: string, telegramChatId: string): Promise<LinkedUser> {
   return request<LinkedUser>('/auth/telegram/link', { code, telegramChatId });
 }
+
+export function runDueBriefings(): Promise<{ sent: number }> {
+  return request<{ sent: number }>('/internal/briefing/run', {});
+}
+
+export function sendTelegramCommand(
+  telegramChatId: string,
+  command: string,
+  args: string,
+): Promise<{ text: string }> {
+  return request<{ text: string }>('/internal/telegram/command', {
+    telegramChatId,
+    command,
+    args,
+  });
+}

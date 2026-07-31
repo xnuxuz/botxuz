@@ -60,7 +60,11 @@ tasks:
 
   test:
     # passWithNoTests: project yang belum punya test tidak boleh menggagalkan CI.
-    command: 'pnpm exec vitest run --passWithNoTests'
+    # --exclude dist: vitest 4 tidak lagi mengabaikannya secara default, jadi
+    # sisa build lama bisa membuat test yang sama jalan dua kali.
+    command: >
+      pnpm exec vitest run --passWithNoTests
+      --exclude '**/node_modules/**' --exclude '**/dist/**'
     inputs:
       - '@group(sources)'
       - '@group(tests)'

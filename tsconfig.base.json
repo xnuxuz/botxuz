@@ -20,5 +20,8 @@
     "sourceMap": true,
     "composite": true
   },
-  "exclude": ["node_modules", "dist", ".next"]
+  // Test tidak ikut dibuild: hasil kompilasinya di dist akan ditemukan ulang
+  // oleh vitest sehingga tiap test jalan dua kali, dan test tidak perlu ikut
+  // masuk ke image produksi.
+  "exclude": ["node_modules", "dist", ".next", "**/*.test.ts", "**/*.test.tsx"]
 }

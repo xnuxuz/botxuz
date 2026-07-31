@@ -3,6 +3,7 @@ import { QUEUES } from '@xnuxuz/shared';
 import type { Worker } from 'bullmq';
 import { startTelegramBot } from './bot/telegram.js';
 import { env, logger } from './config.js';
+import { processDigest, registerDigestSchedule } from './jobs/digest.js';
 import { processNotification } from './jobs/notification.js';
 import { processReminder } from './jobs/reminder.js';
 import { closeQueues, createWorker } from './queues.js';
@@ -11,7 +12,10 @@ async function main(): Promise<void> {
   const workers: Worker[] = [
     createWorker(QUEUES.reminder, processReminder),
     createWorker(QUEUES.notification, processNotification),
+    createWorker(QUEUES.digest, processDigest),
   ];
+
+  await registerDigestSchedule();
 
   for (const worker of workers) {
     worker.on('failed', (job, error) => {

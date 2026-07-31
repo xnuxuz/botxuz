@@ -5,6 +5,7 @@ import {
   type NotificationPriority,
   type NotifType,
   notificationPayloadSchema,
+  toJobId,
 } from '@xnuxuz/shared';
 import type { Job } from 'bullmq';
 import { logger } from '../config.js';
@@ -45,7 +46,7 @@ export async function processNotification(job: Job<NotificationJob>): Promise<vo
     const delay = Math.max(result.retryAt.getTime() - Date.now(), 0);
     await getQueue(QUEUES.notification).add('deferred', job.data, {
       delay,
-      jobId: `${payload.idempotencyKey}:deferred`,
+      jobId: toJobId(payload.idempotencyKey, 'deferred'),
     });
     logger.info(
       { jobId: job.id, userId, retryAt: result.retryAt },

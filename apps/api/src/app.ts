@@ -9,6 +9,10 @@ import { errorHandler, notFoundHandler } from './http/errors.js';
 import { healthRouter } from './http/health.js';
 import { globalRateLimit } from './http/rate-limit.js';
 import { authRouter } from './modules/auth/routes.js';
+import { categoryRouter } from './modules/category/routes.js';
+import { eventRouter } from './modules/event/routes.js';
+import { internalRouter } from './modules/internal/routes.js';
+import { taskRouter } from './modules/task/routes.js';
 import { userRouter } from './modules/user/routes.js';
 
 export function createApp(): Express {
@@ -31,10 +35,20 @@ export function createApp(): Express {
   const v1 = Router();
   // Modul (schedule, grinding, finance, ai) menyusul di sini per fase.
   v1.get('/', (_req, res) => {
-    res.json({ ok: true, data: { version: 'v1', modules: ['auth', 'user'] } });
+    res.json({
+      ok: true,
+      data: {
+        version: 'v1',
+        modules: ['auth', 'user', 'categories', 'tasks', 'events'],
+      },
+    });
   });
   v1.use('/auth', authRouter);
   v1.use('/user', userRouter);
+  v1.use('/categories', categoryRouter);
+  v1.use('/tasks', taskRouter);
+  v1.use('/events', eventRouter);
+  v1.use('/internal', internalRouter);
   app.use(API_PREFIX, v1);
 
   app.use(notFoundHandler);

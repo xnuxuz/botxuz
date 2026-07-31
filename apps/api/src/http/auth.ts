@@ -6,7 +6,6 @@ import { verifyAccessToken } from '../modules/auth/tokens.js';
 import { AppError } from './errors.js';
 
 declare global {
-  // biome-ignore lint/style/noNamespace: augmentasi tipe Express memang lewat namespace.
   namespace Express {
     interface Request {
       auth?: { userId: string; sessionId: string };
