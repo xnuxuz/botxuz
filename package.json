@@ -1,0 +1,35 @@
+{
+  "name": "xnuxuz",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "xnuxuz Personal Life OS — schedule, grinding, finance dalam satu ekosistem",
+  "packageManager": "pnpm@11.18.0",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "build": "moon run :build",
+    "dev": "moon run :dev",
+    "lint": "moon run :lint",
+    "check": "biome check --write .",
+    "format": "biome format --write .",
+    "typecheck": "moon run :typecheck",
+    "test": "moon run :test",
+    "ci": "moon ci",
+    "db:generate": "pnpm --filter @xnuxuz/db generate",
+    "db:migrate": "pnpm --filter @xnuxuz/db migrate",
+    "db:studio": "pnpm --filter @xnuxuz/db studio",
+    "infra:up": "docker compose up -d mysql redis",
+    "infra:down": "docker compose down",
+    "prepare": "lefthook install"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.6",
+    "@types/node": "^26.1.2",
+    "lefthook": "^2.1.10",
+    "tsx": "^4.23.1",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.10"
+  }
+}

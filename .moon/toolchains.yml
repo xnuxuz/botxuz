@@ -1,0 +1,11 @@
+$schema: 'https://moonrepo.dev/schemas/toolchain.json'
+
+# Versi dipin di sini supaya laptop, VPS, dan CI identik (REQUIREMENT §5.5).
+node:
+  version: '24.16.0'
+
+pnpm:
+  version: '11.18.0'
+
+# Toolchain `typescript` sengaja tidak dipakai: project reference dan tsconfig
+# dikelola manual, dan toolchain itu ikut menyuntik argumen ke command `build`.

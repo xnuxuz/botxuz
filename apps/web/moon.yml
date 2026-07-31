@@ -1,0 +1,51 @@
+$schema: 'https://moonrepo.dev/schemas/project.json'
+
+layer: 'application'
+language: 'typescript'
+toolchains:
+  default: 'node'
+stack: 'frontend'
+
+project:
+  name: 'web'
+  description: 'Next.js dashboard'
+
+dependsOn:
+  - 'shared'
+
+tasks:
+  # Next punya build sendiri, bukan `tsc --build` warisan dari .moon/tasks/node.yml.
+  # mergeArgs replace supaya argumen task induk tidak ikut ter-append.
+  build:
+    command: 'pnpm exec next build'
+    inputs:
+      - '@group(sources)'
+      - '@group(configs)'
+      - 'next.config.ts'
+    # `outputs` dikosongkan (menimpa 'dist' warisan): .next di-gitignore
+    # sehingga moon tidak bisa melacaknya, dan Next.js punya cache sendiri.
+    outputs: []
+    options:
+      mergeArgs: 'replace'
+      mergeOutputs: 'replace'
+    deps:
+      - '^:build'
+
+  typecheck:
+    command: 'pnpm exec tsc --noEmit'
+    options:
+      mergeArgs: 'replace'
+    deps:
+      - '^:build'
+
+  dev:
+    command: 'pnpm exec next dev --port 3010'
+    preset: 'server'
+    deps:
+      - '^:build'
+
+  start:
+    command: 'pnpm exec next start --port 3010'
+    preset: 'server'
+    deps:
+      - 'build'

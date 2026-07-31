@@ -1,0 +1,37 @@
+node_modules/
+dist/
+build/
+.next/
+apps/web/next-env.d.ts
+out/
+coverage/
+
+# Secrets — jangan pernah masuk git (REQUIREMENT §5.2)
+.env
+.env.*
+!.env.example
+
+# moon
+.moon/cache
+.moon/docker
+*.tsbuildinfo
+
+# Prisma client hasil generate
+packages/db/src/generated/
+
+# Logs & runtime
+*.log
+logs/
+pids/
+*.pid
+
+# Data volume lokal
+.data/
+backups/
+
+# Editor & OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json

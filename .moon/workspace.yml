@@ -1,0 +1,17 @@
+$schema: 'https://moonrepo.dev/schemas/workspace.json'
+
+# Semua app dan shared package di monorepo ini.
+projects:
+  - 'apps/*'
+  - 'packages/*'
+
+vcs:
+  client: 'git'
+  defaultBranch: 'main'
+  provider: 'github'
+
+pipeline:
+  # Dependency di-install pnpm sekali di root, bukan per-task.
+  installDependencies: false
+
+telemetry: false

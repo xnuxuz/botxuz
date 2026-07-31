@@ -1,0 +1,19 @@
+packages:
+  - 'apps/*'
+  - 'packages/*'
+
+# Native module / postinstall yang memang perlu dijalankan.
+allowBuilds:
+  '@biomejs/biome': true
+  '@prisma/engines': true
+  argon2: true
+  esbuild: true
+  lefthook: true
+  msgpackr-extract: true
+  prisma: true
+  sharp: true
+
+minimumReleaseAgeExclude:
+  - '@types/react-dom@19.2.4'
+  - '@types/react@19.2.18'
+  - bullmq@6.0.1

@@ -1,0 +1,16 @@
+node_modules
+**/node_modules
+dist
+**/dist
+.next
+**/.next
+.moon/cache
+.git
+.env
+.env.*
+!.env.example
+coverage
+graphify-out
+*.log
+.data
+backups

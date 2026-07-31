@@ -1,0 +1,126 @@
+name: xnuxuz
+
+services:
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?wajib diisi di .env}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-xnuxuz}
+      MYSQL_USER: ${MYSQL_USER:-xnuxuz}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?wajib diisi di .env}
+      TZ: UTC
+    command:
+      - --default-time-zone=+00:00
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      # VPS 4GB — buffer pool dibatasi supaya tidak menekan Node & Redis.
+      - --innodb-buffer-pool-size=512M
+    volumes:
+      - mysql-data:/var/lib/mysql
+      # Dijalankan sekali saat volume dibuat (grant shadow DB untuk migrate).
+      - ./infra/mysql/init:/docker-entrypoint-initdb.d:ro
+    ports:
+      - '127.0.0.1:${MYSQL_PORT:-3316}:3306'
+    healthcheck:
+      test: ['CMD', 'mysqladmin', 'ping', '-h', 'localhost', '-p${MYSQL_ROOT_PASSWORD}']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  redis:
+    # redis-stack-server = Redis + RediSearch, dipakai untuk vector search RAG.
+    image: redis/redis-stack-server:7.4.0-v3
+    restart: unless-stopped
+    command: redis-stack-server --save 60 1 --appendonly yes --maxmemory 300mb --maxmemory-policy noeviction
+    volumes:
+      - redis-data:/data
+    ports:
+      - '127.0.0.1:${REDIS_PORT:-6389}:6379'
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: infra/Dockerfile
+      target: api
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: mysql://${MYSQL_USER:-xnuxuz}:${MYSQL_PASSWORD}@mysql:3306/${MYSQL_DATABASE:-xnuxuz}
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      mysql: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    expose:
+      - '3011'
+    healthcheck:
+      test: ['CMD', 'node', '-e', "fetch('http://localhost:3011/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    profiles: ['app']
+
+  worker:
+    build:
+      context: .
+      dockerfile: infra/Dockerfile
+      target: worker
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: mysql://${MYSQL_USER:-xnuxuz}:${MYSQL_PASSWORD}@mysql:3306/${MYSQL_DATABASE:-xnuxuz}
+      REDIS_URL: redis://redis:6379
+      API_BASE_URL: http://api:3011
+    depends_on:
+      mysql: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    profiles: ['app']
+
+  web:
+    build:
+      context: .
+      dockerfile: infra/Dockerfile
+      target: web
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      # Server standalone Next membaca PORT dari env.
+      PORT: 3010
+      NEXT_PUBLIC_API_URL: https://${DOMAIN:-localhost}/api
+    depends_on:
+      - api
+    expose:
+      - '3010'
+    profiles: ['app']
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN:-localhost}
+    volumes:
+      - ./infra/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    ports:
+      - '80:80'
+      - '443:443'
+    depends_on:
+      - api
+      - web
+    profiles: ['app']
+
+volumes:
+  mysql-data:
+  redis-data:
+  caddy-data:
+  caddy-config:

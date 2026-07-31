@@ -1,0 +1,46 @@
+$schema: 'https://moonrepo.dev/schemas/project.json'
+
+layer: 'library'
+language: 'typescript'
+toolchains:
+  default: 'node'
+stack: 'backend'
+
+project:
+  name: 'db'
+  description: 'Prisma schema, migration, dan query layer'
+
+dependsOn:
+  - 'shared'
+
+tasks:
+  generate:
+    command: 'pnpm exec prisma generate'
+    inputs:
+      - 'prisma/schema.prisma'
+    outputs:
+      - 'src/generated'
+
+  # Client harus di-generate sebelum tsc bisa resolve tipe-nya.
+  build:
+    deps:
+      - 'generate'
+      - '^:build'
+
+  typecheck:
+    deps:
+      - 'generate'
+      - '^:build'
+
+  migrate:
+    command: 'pnpm exec prisma migrate dev'
+    options:
+      cache: false
+      runInCI: false
+      interactive: true
+
+  migrate-deploy:
+    command: 'pnpm exec prisma migrate deploy'
+    options:
+      cache: false
+      runInCI: false

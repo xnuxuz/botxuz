@@ -1,0 +1,67 @@
+$schema: 'https://moonrepo.dev/schemas/tasks.json'
+
+# Task standar yang diwarisi SEMUA project Node di monorepo.
+# Definisi sekali di sini, tiap project cuma override kalau perlu.
+
+fileGroups:
+  sources:
+    - 'src/**/*'
+  tests:
+    - 'tests/**/*'
+    - 'src/**/*.test.ts'
+  configs:
+    - 'tsconfig.json'
+    - 'package.json'
+
+tasks:
+  build:
+    command: 'pnpm exec tsc --build'
+    inputs:
+      - '@group(sources)'
+      - '@group(configs)'
+    outputs:
+      - 'dist'
+    deps:
+      - '^:build'
+
+  typecheck:
+    command: 'pnpm exec tsc --noEmit'
+    inputs:
+      - '@group(sources)'
+      - '@group(tests)'
+      - '@group(configs)'
+    deps:
+      - '^:build'
+
+  lint:
+    command: 'pnpm exec biome check .'
+    inputs:
+      - '@group(sources)'
+      - '@group(tests)'
+      - '/biome.json'
+
+  format:
+    command: 'pnpm exec biome format --write .'
+    inputs:
+      - '@group(sources)'
+      - '@group(tests)'
+      - '/biome.json'
+    options:
+      cache: false
+
+  check:
+    command: 'pnpm exec biome check --write .'
+    inputs:
+      - '@group(sources)'
+      - '@group(tests)'
+      - '/biome.json'
+    options:
+      cache: false
+
+  test:
+    # passWithNoTests: project yang belum punya test tidak boleh menggagalkan CI.
+    command: 'pnpm exec vitest run --passWithNoTests'
+    inputs:
+      - '@group(sources)'
+      - '@group(tests)'
+      - '@group(configs)'

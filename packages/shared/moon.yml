@@ -1,0 +1,11 @@
+$schema: 'https://moonrepo.dev/schemas/project.json'
+
+layer: 'library'
+language: 'typescript'
+toolchains:
+  node: {}
+stack: 'infrastructure'
+
+project:
+  name: 'shared'
+  description: 'Types, zod schema, dan konstanta yang dipakai semua app'

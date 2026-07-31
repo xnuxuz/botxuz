@@ -1,0 +1,29 @@
+{
+	# Let's Encrypt otomatis — gratis, tanpa konfigurasi SSL manual.
+	email adam.albani.t@gmail.com
+}
+
+{$DOMAIN} {
+	encode zstd gzip
+
+	# Semua request API diteruskan ke Express; prefix /api dipertahankan
+	# supaya route tetap /api/v1/... di sisi API.
+	handle /api/* {
+		reverse_proxy api:3011
+	}
+
+	handle /health* {
+		reverse_proxy api:3011
+	}
+
+	handle {
+		reverse_proxy web:3010
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+}

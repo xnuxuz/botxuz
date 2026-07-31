@@ -1,0 +1,43 @@
+// Prisma 7: query compiler TypeScript (tanpa Rust engine) + driver adapter.
+// Footprint RAM kecil, cocok untuk VPS 4GB.
+
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  runtime      = "nodejs"
+  moduleFormat = "esm"
+}
+
+// URL koneksi hidup di prisma.config.ts (Prisma 7), bukan di sini.
+datasource db {
+  provider = "mysql"
+}
+
+// ---------------------------------------------------------------------------
+// Fase 0 sengaja hanya memodelkan User. Entitas lain (events, tasks, sessions,
+// accounts, transactions, budgets, categories, user_facts, dst.) menyusul di
+// dokumen schema terpisah — lihat REQUIREMENT.MD §6.
+//
+// Aturan yang berlaku untuk SEMUA tabel berikutnya:
+//   - wajib punya userId sejak hari pertama (future-proofing SaaS, §5.4)
+//   - uang selalu Int rupiah, tidak pernah Float/Decimal (§3.4)
+//   - timestamp disimpan UTC, konversi timezone di edge (§5.2)
+// ---------------------------------------------------------------------------
+
+model User {
+  id           String  @id @default(uuid(7)) @db.Char(36)
+  email        String  @unique @db.VarChar(255)
+  passwordHash String  @map("password_hash") @db.VarChar(255)
+  displayName  String? @map("display_name") @db.VarChar(100)
+
+  // Zona waktu user; DB tetap UTC.
+  timezone String @default("Asia/Jakarta") @db.VarChar(64)
+
+  // Diisi setelah user menjalankan /link <code> di bot Telegram.
+  telegramChatId String? @unique @map("telegram_chat_id") @db.VarChar(32)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("users")
+}

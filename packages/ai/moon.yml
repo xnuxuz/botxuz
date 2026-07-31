@@ -1,0 +1,14 @@
+$schema: 'https://moonrepo.dev/schemas/project.json'
+
+layer: 'library'
+language: 'typescript'
+toolchains:
+  default: 'node'
+stack: 'backend'
+
+project:
+  name: 'ai'
+  description: 'Abstraksi provider LLM, prompt, dan function schema intent router'
+
+dependsOn:
+  - 'shared'
