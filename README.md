@@ -126,6 +126,10 @@ semuanya butuh header `Authorization: Bearer <access token>`.
 | GET | `/events/schedule?from=&to=` | jadwal dengan RRULE sudah diekspansi |
 | GET | `/events/conflicts?from=&to=` | cek bentrok sebelum simpan |
 | GET/POST/PATCH/DELETE | `/events` | CRUD event |
+| POST | `/sessions/start` `/sessions/stop` | timer sesi kerja |
+| GET/POST/DELETE | `/sessions` | riwayat & entri manual |
+| GET | `/sessions/stats` | streak, heatmap, progres mingguan |
+| GET/PUT/DELETE | `/goals[/:categoryId]` | target jam mingguan per kategori |
 
 Endpoint di bawah `/internal` hanya untuk worker/bot, dilindungi
 `x-internal-secret`, dan tidak diteruskan Caddy ke publik.
@@ -159,7 +163,9 @@ Fase 1 — sedang berjalan:
   saat item digeser/dihapus, job id deterministik supaya tidak double-fire
 - ✅ Daily briefing per zona waktu user (jadwal, task prioritas, sisa jatah harian)
 - ✅ Bot Telegram dua arah
-- ⬜ Session logging & streak, goal mingguan, nightly review
+- ✅ Session logging (timer + entri manual), streak global & per kategori,
+  heatmap kontribusi, goal jam mingguan
+- ⬜ Nightly review otomatis
 
 Belum tersentuh: modul finance (fase 3), AI layer (fase 2), Google Calendar sync,
 dashboard web.

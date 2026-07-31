@@ -12,6 +12,7 @@ import { authRouter } from './modules/auth/routes.js';
 import { categoryRouter } from './modules/category/routes.js';
 import { eventRouter } from './modules/event/routes.js';
 import { internalRouter } from './modules/internal/routes.js';
+import { goalRouter, sessionRouter } from './modules/session/routes.js';
 import { taskRouter } from './modules/task/routes.js';
 import { userRouter } from './modules/user/routes.js';
 
@@ -39,7 +40,7 @@ export function createApp(): Express {
       ok: true,
       data: {
         version: 'v1',
-        modules: ['auth', 'user', 'categories', 'tasks', 'events'],
+        modules: ['auth', 'user', 'categories', 'tasks', 'events', 'sessions', 'goals'],
       },
     });
   });
@@ -48,6 +49,8 @@ export function createApp(): Express {
   v1.use('/categories', categoryRouter);
   v1.use('/tasks', taskRouter);
   v1.use('/events', eventRouter);
+  v1.use('/sessions', sessionRouter);
+  v1.use('/goals', goalRouter);
   v1.use('/internal', internalRouter);
   app.use(API_PREFIX, v1);
 
