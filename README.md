@@ -16,7 +16,7 @@ xnuxuz/
 ├── apps/
 │   ├── api/                # Express API — single source of truth  (@xnuxuz/api)
 │   ├── worker/             # BullMQ consumer + bot Telegram        (@xnuxuz/worker)
-│   └── web/                # Next.js dashboard                     (@xnuxuz/web)
+│   └── web/                # Dashboard Next.js                     (@xnuxuz/web)
 ├── packages/
 │   ├── shared/             # types, zod schema, konstanta          (@xnuxuz/shared)
 │   ├── db/                 # Prisma schema, migration, query layer (@xnuxuz/db)
@@ -80,6 +80,19 @@ curl http://localhost:3011/health/ready   # readiness: cek MySQL + Redis
 
 Port default di repo ini digeser (`3011` api, `3010` web, `3316` MySQL, `6389` Redis)
 supaya tidak bentrok dengan service lain di mesin dev. Semuanya bisa diubah lewat `.env`.
+
+## Dashboard web
+
+`http://localhost:3010` — halaman **Hari ini**, **Task**, **Finance**,
+**Statistik**, dan **Pengaturan**.
+
+Token disimpan di cookie `httpOnly`, bukan localStorage: browser tidak pernah
+memanggil API backend langsung, semua lewat server action Next yang menempelkan
+token di sisi server. Satu celah XSS karenanya tidak langsung berarti refresh
+token ikut terbawa keluar (§5.2).
+
+Form memakai progressive enhancement, jadi mencatat transaksi dan menyelesaikan
+task tetap jalan walau JavaScript gagal dimuat.
 
 ## Task moon
 
@@ -207,4 +220,15 @@ Fase 2 (AI layer) — inti selesai:
 Tanpa `GROQ_API_KEY`, asisten tetap melayani quick entry finance dan menolak
 dengan jelas untuk kalimat yang tidak dikenali — bukan menebak.
 
-Belum tersentuh: Google Calendar sync dan dashboard web.
+Fase 5 (web) — dashboard selesai:
+
+- ✅ Login dengan cookie httpOnly + refresh otomatis saat access token habis
+- ✅ Hari ini: saldo, streak, jadwal, task prioritas, peringatan budget
+- ✅ Task: buat, kelompokkan per status, tandai selesai
+- ✅ Finance: catat transaksi, riwayat, budget, breakdown, arus kas 6 bulan
+- ✅ Statistik: streak, heatmap kontribusi 26 minggu, progres mingguan
+- ✅ Pengaturan: perangkat aktif, preferensi notifikasi, kode link Telegram
+- ✅ Mode gelap mengikuti sistem, responsif sampai lebar 390px
+- ⬜ CRUD event dan pengelolaan kategori masih lewat API
+
+Belum tersentuh: Google Calendar sync.

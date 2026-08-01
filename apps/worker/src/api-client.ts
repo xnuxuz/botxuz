@@ -43,8 +43,8 @@ export function linkTelegramAccount(code: string, telegramChatId: string): Promi
   return request<LinkedUser>('/auth/telegram/link', { code, telegramChatId });
 }
 
-export function runDueBriefings(): Promise<{ sent: number }> {
-  return request<{ sent: number }>('/internal/briefing/run', {});
+export function runDueBriefings(): Promise<{ sent: number; reviews: number }> {
+  return request<{ sent: number; reviews: number }>('/internal/briefing/run', {});
 }
 
 export function runFinanceDaily(): Promise<{ created: number; alerts: number }> {

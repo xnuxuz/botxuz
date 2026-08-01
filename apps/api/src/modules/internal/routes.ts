@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { db } from '../../db.js';
 import { requireInternalSecret } from '../../http/auth.js';
+import { runDueReviews } from '../briefing/review.js';
 import { runDueBriefings } from '../briefing/service.js';
 import { checkBudgetAlerts, currentMonth } from '../finance/budgets.js';
 import { runDueRecurring } from '../finance/recurring.js';
@@ -19,9 +20,14 @@ export const internalRouter: Router = Router();
 
 internalRouter.use(requireInternalSecret);
 
-/** Dipanggil job terjadwal tiap 15 menit; API yang menentukan siapa yang jatuh tempo. */
+/**
+ * Dipanggil job terjadwal tiap 15 menit; API yang menentukan siapa yang jatuh
+ * tempo. Satu sweep menangani briefing pagi dan review malam sekaligus —
+ * keduanya dipicu oleh jam lokal user, jadi kadensnya harus sama.
+ */
 internalRouter.post('/briefing/run', async (_req, res) => {
-  res.json({ ok: true, data: await runDueBriefings() });
+  const [briefings, reviews] = await Promise.all([runDueBriefings(), runDueReviews()]);
+  res.json({ ok: true, data: { sent: briefings.sent, reviews: reviews.sent } });
 });
 
 /**

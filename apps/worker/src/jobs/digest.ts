@@ -14,7 +14,10 @@ const SCHEDULER_ID = 'briefing-sweep';
  */
 export async function processDigest(job: Job): Promise<void> {
   const result = await runDueBriefings();
-  logger.info({ jobId: job.id, sent: result.sent }, 'Sweep briefing selesai');
+  logger.info(
+    { jobId: job.id, briefings: result.sent, reviews: result.reviews },
+    'Sweep briefing & review selesai',
+  );
 }
 
 export async function registerDigestSchedule(): Promise<void> {
