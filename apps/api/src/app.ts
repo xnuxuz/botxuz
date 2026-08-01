@@ -8,6 +8,7 @@ import { logger } from './config/logger.js';
 import { errorHandler, notFoundHandler } from './http/errors.js';
 import { healthRouter } from './http/health.js';
 import { globalRateLimit } from './http/rate-limit.js';
+import { aiRouter } from './modules/ai/routes.js';
 import { authRouter } from './modules/auth/routes.js';
 import { categoryRouter } from './modules/category/routes.js';
 import { eventRouter } from './modules/event/routes.js';
@@ -60,6 +61,7 @@ export function createApp(): Express {
           'budgets',
           'recurring',
           'reports',
+          'ai',
         ],
       },
     });
@@ -76,6 +78,7 @@ export function createApp(): Express {
   v1.use('/budgets', budgetRouter);
   v1.use('/recurring', recurringRouter);
   v1.use('/reports', reportRouter);
+  v1.use('/ai', aiRouter);
   v1.use('/internal', internalRouter);
   app.use(API_PREFIX, v1);
 

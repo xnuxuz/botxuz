@@ -138,6 +138,11 @@ semuanya butuh header `Authorization: Bearer <access token>`.
 | GET/POST/PATCH/DELETE | `/recurring` | transaksi berulang (kos, langganan) |
 | GET | `/reports/cashflow` `/reports/breakdown` | tren & komposisi |
 | GET | `/reports/export.csv` | ekspor transaksi |
+| POST | `/ai/message` | natural language → intent → function call |
+| POST | `/ai/confirm/:id` `/ai/reject/:id` | konfirmasi aksi write |
+| GET/PUT/DELETE | `/ai/facts` | structured memory |
+| GET/PUT/DELETE | `/ai/rules` | correction rules (override deterministik) |
+| POST | `/ai/feedback` | 👍/👎 per aksi AI |
 
 Endpoint di bawah `/internal` hanya untuk worker/bot, dilindungi
 `x-internal-secret`, dan tidak diteruskan Caddy ke publik.
@@ -145,6 +150,9 @@ Endpoint di bawah `/internal` hanya untuk worker/bot, dilindungi
 ## Perintah bot
 
 `/link <kode>` · `/today` · `/tasks` · `/task <judul>` · `/done <nomor>` · `/help`
+
+Pesan biasa (tanpa `/`) masuk ke intent router. Aksi yang menulis data selalu
+memunculkan tombol ✅ / ❌ dulu — AI tidak pernah menyimpan tanpa persetujuan.
 
 Handler bot hanya meneruskan ke API dan menampilkan balasannya — nol business
 logic di bot (§2).
@@ -185,5 +193,18 @@ Fase 3 (finance) — selesai lebih awal karena bisa diverifikasi tanpa API key:
 - ✅ Recurring transaction dengan pengejaran ketertinggalan kalau worker sempat mati
 - ✅ Laporan cashflow, breakdown kategori, ekspor CSV
 
-Belum tersentuh: AI layer (fase 2 — butuh `GROQ_API_KEY`/`GEMINI_API_KEY`),
-Google Calendar sync, dan dashboard web.
+Fase 2 (AI layer) — inti selesai:
+
+- ✅ Intent router satu endpoint: jalur deterministik dulu, LLM sebagai cadangan
+- ✅ Quick entry finance tanpa LLM ("keluar 25rb makan siang gofood") — tetap
+  jalan saat provider down atau kena rate limit (§5.3)
+- ✅ Context assembler: user_facts → kondisi hari ini → correction rules
+- ✅ Konfirmasi wajib sebelum aksi write, sekali pakai, kedaluwarsa 15 menit
+- ✅ Correction rules mengalahkan tebakan LLM, dengan hit count untuk pruning
+- ✅ Feedback loop 👍/👎
+- ⬜ Memory extraction job dan RAG episodic (butuh `GEMINI_API_KEY`)
+
+Tanpa `GROQ_API_KEY`, asisten tetap melayani quick entry finance dan menolak
+dengan jelas untuk kalimat yang tidak dikenali — bukan menebak.
+
+Belum tersentuh: Google Calendar sync dan dashboard web.

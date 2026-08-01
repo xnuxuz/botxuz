@@ -1,9 +1,17 @@
 import { db } from '../../db.js';
+import { AppError } from '../../http/errors.js';
+import { dropPending } from '../ai/pending.js';
+import { confirmPending, handleMessage } from '../ai/service.js';
 import { composeBriefing } from '../briefing/service.js';
 import { completeTask, createTask, listTasks } from '../task/service.js';
 
 export type CommandInput = { telegramChatId: string; command: string; args: string };
-export type CommandReply = { text: string };
+
+export type CommandReply = {
+  text: string;
+  /** Kalau ada, bot menampilkan tombol konfirmasi ✅ ✏️ ❌ (§3.5). */
+  confirm?: { pendingId: string } | null;
+};
 
 const NOT_LINKED: CommandReply = {
   text: 'Akun ini belum terhubung. Ambil kode di dashboard lalu kirim /link <kode>.',
@@ -14,11 +22,7 @@ const NOT_LINKED: CommandReply = {
  * dan perilaku yang sama bisa dipakai ulang oleh client lain (§2).
  */
 export async function handleTelegramCommand(input: CommandInput): Promise<CommandReply> {
-  const user = await db.user.findUnique({
-    where: { telegramChatId: input.telegramChatId },
-    select: { id: true, timezone: true },
-  });
-
+  const user = await userOf(input.telegramChatId);
   if (!user) return NOT_LINKED;
 
   const args = input.args.trim();
@@ -84,4 +88,64 @@ async function done(userId: string, args: string): Promise<CommandReply> {
     : '';
 
   return { text: `Selesai: ${target.title} ✅${followUp}` };
+}
+
+/**
+ * Pesan bebas: langsung ke intent router. Aksi write tidak pernah langsung
+ * dieksekusi — selalu lewat kartu konfirmasi (§3.5).
+ */
+export async function handleTelegramMessage(input: {
+  telegramChatId: string;
+  text: string;
+}): Promise<CommandReply> {
+  const user = await userOf(input.telegramChatId);
+  if (!user) return NOT_LINKED;
+
+  try {
+    const reply = await handleMessage(user.id, input.text);
+
+    switch (reply.kind) {
+      case 'confirm':
+        return {
+          text: `Konfirmasi dulu ya:\n\n${reply.pending.preview}`,
+          confirm: { pendingId: reply.pending.id },
+        };
+      case 'result':
+        return { text: reply.summary };
+      case 'text':
+        return { text: reply.text };
+    }
+  } catch (error) {
+    if (error instanceof AppError) return { text: error.message };
+    throw error;
+  }
+}
+
+export async function handleTelegramCallback(input: {
+  telegramChatId: string;
+  action: 'confirm' | 'reject';
+  pendingId: string;
+}): Promise<CommandReply> {
+  const user = await userOf(input.telegramChatId);
+  if (!user) return NOT_LINKED;
+
+  try {
+    if (input.action === 'reject') {
+      await dropPending(user.id, input.pendingId);
+      return { text: 'Dibatalkan. ❌' };
+    }
+
+    const result = await confirmPending(user.id, input.pendingId);
+    return { text: `${result.summary} ✅` };
+  } catch (error) {
+    if (error instanceof AppError) return { text: error.message };
+    throw error;
+  }
+}
+
+async function userOf(telegramChatId: string) {
+  return db.user.findUnique({
+    where: { telegramChatId },
+    select: { id: true, timezone: true },
+  });
 }

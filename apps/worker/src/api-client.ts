@@ -51,14 +51,24 @@ export function runFinanceDaily(): Promise<{ created: number; alerts: number }> 
   return request<{ created: number; alerts: number }>('/internal/finance/run', {});
 }
 
+export type BotReply = { text: string; confirm?: { pendingId: string } | null };
+
 export function sendTelegramCommand(
   telegramChatId: string,
   command: string,
   args: string,
-): Promise<{ text: string }> {
-  return request<{ text: string }>('/internal/telegram/command', {
-    telegramChatId,
-    command,
-    args,
-  });
+): Promise<BotReply> {
+  return request<BotReply>('/internal/telegram/command', { telegramChatId, command, args });
+}
+
+export function sendTelegramMessage(telegramChatId: string, text: string): Promise<BotReply> {
+  return request<BotReply>('/internal/telegram/message', { telegramChatId, text });
+}
+
+export function sendTelegramCallback(
+  telegramChatId: string,
+  action: 'confirm' | 'reject',
+  pendingId: string,
+): Promise<BotReply> {
+  return request<BotReply>('/internal/telegram/callback', { telegramChatId, action, pendingId });
 }

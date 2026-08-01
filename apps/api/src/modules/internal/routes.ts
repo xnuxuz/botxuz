@@ -5,7 +5,11 @@ import { requireInternalSecret } from '../../http/auth.js';
 import { runDueBriefings } from '../briefing/service.js';
 import { checkBudgetAlerts, currentMonth } from '../finance/budgets.js';
 import { runDueRecurring } from '../finance/recurring.js';
-import { handleTelegramCommand } from '../telegram/commands.js';
+import {
+  handleTelegramCallback,
+  handleTelegramCommand,
+  handleTelegramMessage,
+} from '../telegram/commands.js';
 
 /**
  * Endpoint yang hanya dipanggil worker/bot, bukan browser. Dilindungi shared
@@ -54,4 +58,29 @@ internalRouter.post('/telegram/command', async (req, res) => {
   const input = commandSchema.parse(req.body);
   const reply = await handleTelegramCommand(input);
   res.json({ ok: true, data: reply });
+});
+
+/** Pesan bebas (bukan /perintah) diteruskan ke intent router AI. */
+internalRouter.post('/telegram/message', async (req, res) => {
+  const input = z
+    .object({
+      telegramChatId: z.string().min(1).max(32),
+      text: z.string().min(1).max(2_000),
+    })
+    .parse(req.body);
+
+  res.json({ ok: true, data: await handleTelegramMessage(input) });
+});
+
+/** Tombol inline ✅ / ❌ pada kartu konfirmasi. */
+internalRouter.post('/telegram/callback', async (req, res) => {
+  const input = z
+    .object({
+      telegramChatId: z.string().min(1).max(32),
+      action: z.enum(['confirm', 'reject']),
+      pendingId: z.string().min(1).max(64),
+    })
+    .parse(req.body);
+
+  res.json({ ok: true, data: await handleTelegramCallback(input) });
 });
