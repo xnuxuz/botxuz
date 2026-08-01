@@ -9,7 +9,7 @@ export type CommandInput = { telegramChatId: string; command: string; args: stri
 
 export type CommandReply = {
   text: string;
-  /** Kalau ada, bot menampilkan tombol konfirmasi ✅ ✏️ ❌ (§3.5). */
+  /** Kalau ada, bot menampilkan tombol konfirmasi ✅ / ❌ (§3.5). Tombol edit ✏️ belum ada. */
   confirm?: { pendingId: string } | null;
 };
 
