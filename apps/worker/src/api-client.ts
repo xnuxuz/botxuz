@@ -47,6 +47,10 @@ export function runDueBriefings(): Promise<{ sent: number }> {
   return request<{ sent: number }>('/internal/briefing/run', {});
 }
 
+export function runFinanceDaily(): Promise<{ created: number; alerts: number }> {
+  return request<{ created: number; alerts: number }>('/internal/finance/run', {});
+}
+
 export function sendTelegramCommand(
   telegramChatId: string,
   command: string,

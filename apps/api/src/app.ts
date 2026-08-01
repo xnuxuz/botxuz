@@ -11,6 +11,13 @@ import { globalRateLimit } from './http/rate-limit.js';
 import { authRouter } from './modules/auth/routes.js';
 import { categoryRouter } from './modules/category/routes.js';
 import { eventRouter } from './modules/event/routes.js';
+import {
+  accountRouter,
+  budgetRouter,
+  recurringRouter,
+  reportRouter,
+  transactionRouter,
+} from './modules/finance/routes.js';
 import { internalRouter } from './modules/internal/routes.js';
 import { goalRouter, sessionRouter } from './modules/session/routes.js';
 import { taskRouter } from './modules/task/routes.js';
@@ -40,7 +47,20 @@ export function createApp(): Express {
       ok: true,
       data: {
         version: 'v1',
-        modules: ['auth', 'user', 'categories', 'tasks', 'events', 'sessions', 'goals'],
+        modules: [
+          'auth',
+          'user',
+          'categories',
+          'tasks',
+          'events',
+          'sessions',
+          'goals',
+          'accounts',
+          'transactions',
+          'budgets',
+          'recurring',
+          'reports',
+        ],
       },
     });
   });
@@ -51,6 +71,11 @@ export function createApp(): Express {
   v1.use('/events', eventRouter);
   v1.use('/sessions', sessionRouter);
   v1.use('/goals', goalRouter);
+  v1.use('/accounts', accountRouter);
+  v1.use('/transactions', transactionRouter);
+  v1.use('/budgets', budgetRouter);
+  v1.use('/recurring', recurringRouter);
+  v1.use('/reports', reportRouter);
   v1.use('/internal', internalRouter);
   app.use(API_PREFIX, v1);
 

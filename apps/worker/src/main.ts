@@ -5,6 +5,7 @@ import { startTelegramBot } from './bot/telegram.js';
 import { env, logger } from './config.js';
 import { processDigest, registerDigestSchedule } from './jobs/digest.js';
 import { processNotification } from './jobs/notification.js';
+import { processRecurring, registerRecurringSchedule } from './jobs/recurring.js';
 import { processReminder } from './jobs/reminder.js';
 import { closeQueues, createWorker } from './queues.js';
 
@@ -13,9 +14,10 @@ async function main(): Promise<void> {
     createWorker(QUEUES.reminder, processReminder),
     createWorker(QUEUES.notification, processNotification),
     createWorker(QUEUES.digest, processDigest),
+    createWorker(QUEUES.recurring, processRecurring),
   ];
 
-  await registerDigestSchedule();
+  await Promise.all([registerDigestSchedule(), registerRecurringSchedule()]);
 
   for (const worker of workers) {
     worker.on('failed', (job, error) => {

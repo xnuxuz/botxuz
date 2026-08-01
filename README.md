@@ -130,6 +130,14 @@ semuanya butuh header `Authorization: Bearer <access token>`.
 | GET/POST/DELETE | `/sessions` | riwayat & entri manual |
 | GET | `/sessions/stats` | streak, heatmap, progres mingguan |
 | GET/PUT/DELETE | `/goals[/:categoryId]` | target jam mingguan per kategori |
+| GET/POST/PATCH | `/accounts` | cash, bank, e-wallet + saldo |
+| POST | `/accounts/:id/recalculate` | hitung ulang saldo dari ledger |
+| GET/POST/PATCH/DELETE | `/transactions` | ledger; delete = soft delete |
+| POST | `/transactions/:id/restore` | batalkan soft delete |
+| GET/PUT | `/budgets` | anggaran bulanan + status pemakaian |
+| GET/POST/PATCH/DELETE | `/recurring` | transaksi berulang (kos, langganan) |
+| GET | `/reports/cashflow` `/reports/breakdown` | tren & komposisi |
+| GET | `/reports/export.csv` | ekspor transaksi |
 
 Endpoint di bawah `/internal` hanya untuk worker/bot, dilindungi
 `x-internal-secret`, dan tidak diteruskan Caddy ke publik.
@@ -167,5 +175,15 @@ Fase 1 — sedang berjalan:
   heatmap kontribusi, goal jam mingguan
 - ⬜ Nightly review otomatis
 
-Belum tersentuh: modul finance (fase 3), AI layer (fase 2), Google Calendar sync,
-dashboard web.
+Fase 3 (finance) — selesai lebih awal karena bisa diverifikasi tanpa API key:
+
+- ✅ Akun (cash/bank/e-wallet), saldo di-cache dan bisa direkonsiliasi dari ledger
+- ✅ Ledger income/expense/transfer, uang selalu INTEGER rupiah
+- ✅ Soft delete + restore; efek saldo dibalik lewat rumus yang sama, bukan ditulis ulang
+- ✅ Idempotensi `clientGeneratedId` untuk client offline-first
+- ✅ Budget bulanan + alert Telegram di 80% dan 100%, sekali per ambang
+- ✅ Recurring transaction dengan pengejaran ketertinggalan kalau worker sempat mati
+- ✅ Laporan cashflow, breakdown kategori, ekspor CSV
+
+Belum tersentuh: AI layer (fase 2 — butuh `GROQ_API_KEY`/`GEMINI_API_KEY`),
+Google Calendar sync, dan dashboard web.
